@@ -11,6 +11,7 @@ entity SA1Map is
 		MCLK			: in std_logic;
 		RST_N			: in std_logic;
 		ENABLE		: in std_logic := '1';
+		EMUMODE		: in std_logic;
 		
 		CA   			: in std_logic_vector(23 downto 0);
 		DI				: in std_logic_vector(7 downto 0);
@@ -81,6 +82,7 @@ begin
 		CLK			=> MCLK,
 		RST_N			=> RST_N and MAP_SEL,
 		ENABLE		=> ENABLE,
+		EMUMODE		=> EMUMODE,
 
 		SNES_A		=> CA,
 		SNES_DO		=> DO,

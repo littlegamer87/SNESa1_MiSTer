@@ -9,6 +9,7 @@ entity SA1 is
 		RST_N			: in std_logic;
 		CLK			: in std_logic;
 		ENABLE		: in std_logic;
+		EMUMODE		: in std_logic;
 		
 		SNES_A   	: in std_logic_vector(23 downto 0);
 		SNES_DO		: out std_logic_vector(7 downto 0);
@@ -794,6 +795,29 @@ begin
 						CC1DMA_EXEC <= CC1DMA_SEL;
 					when x"37" =>
 						DDA(17 downto 16) <= SNES_DI(1 downto 0);
+					--	Illegal actions on real hw below, should be accessed by SA1 and not CPU
+					when x"0B" =>							--CIC (DMA IRQ Ack)
+						if (EMUMODE = '1') then
+							if SNES_DI(5) = '1' then
+								DMA_IRQ_FLAG <= '0';
+							end if;
+						end if;
+					when x"30" =>							--DCNT
+						if (EMUMODE = '1') then
+							DMASD <= SNES_DI(1 downto 0);
+							DMADD <= SNES_DI(2);
+							CDSEL <= SNES_DI(4);
+							CDEN <= SNES_DI(5);
+							DPRIO <= SNES_DI(6);
+							DMAEN <= SNES_DI(7);
+							if SNES_DI(7) = '0' then
+								CCDMA_RW <= '0';
+								CC_BPP <= (others => '0');
+								CC_TILE_Y <= (others => '0');
+								CC_TILE_N <= (others => '0');
+								DMA_RUN <= '0';
+							end if;
+						end if;
 					when others => null;
 				end case;
 			elsif SNES_CCDMA_IRAM_ACCESS = '1' and CC1_SNES_BWRAM_MASK = "000000" and SS_BUSY = '0' then
@@ -1160,10 +1184,6 @@ begin
 		FBMAP <= '0';
 		BMAPS <= (others => '0');
 		BBF <= '0';
-		CIWP <= (others => '0');
-		SIWP <= (others => '0');
-		SBWE <= (others => '0');
-		CBWE <= (others => '0');
 		BWPA <= (others => '1');
 		AM <= (others => '0');
 		MOF <= '0';
@@ -1186,6 +1206,18 @@ begin
 		
 		MATH_REQ <= '0';
 		MATH_CLK_CNT <= (others => '0');
+
+		if (EMUMODE = '0') then
+			CIWP <= (others => '0');
+			SIWP <= (others => '0');
+			SBWE <= (others => '0');
+			CBWE <= (others => '0');
+		else
+			CIWP <= (others => '1');
+			SIWP <= (others => '1');
+			SBWE <= x"80";
+			CBWE <= x"80";
+		end if;
 
 	elsif rising_edge(CLK) then
 		if ENABLE = '1' then
@@ -1243,16 +1275,101 @@ begin
 						BWPA <= SNES_DI;
 					when x"29" =>						--SIWP
 						SIWP <= SNES_DI;
-						
-					--it's contrary to the documentation, but some SMW hacks write inerrupt vectors here!
+					--	Illegal actions on real hw below, should be accessed by SA1 and not CPU
+					when x"09" =>						--SCNT
+						if (EMUMODE = '1') then
+							CMSG <= SNES_DI(3 downto 0);
+							NMISEL <= SNES_DI(4);
+							IRQSEL <= SNES_DI(6);
+							if SNES_DI(7) = '1' then
+								SNES_IRQ_FLAG <= '1';
+							end if;
+						end if;
+					when x"0A" =>						--CIE
+						if (EMUMODE = '1' and SS_BUSY = '0') then
+							SA1_NMI_EN <= SNES_DI(4);
+							DMA_IRQ_EN <= SNES_DI(5);
+							TM_IRQ_EN <= SNES_DI(6);
+							SA1_IRQ_EN <= SNES_DI(7);
+						end if;
 					when x"0C" =>						--SNV
-						SNV(7 downto 0) <= SNES_DI;
+						if (EMUMODE = '1') then
+							SNV(7 downto 0) <= SNES_DI;
+						end if;
 					when x"0D" =>
-						SNV(15 downto 8) <= SNES_DI;
+						if (EMUMODE = '1') then
+							SNV(15 downto 8) <= SNES_DI;
+						end if;
 					when x"0E" =>						--SIV
-						SIV(7 downto 0) <= SNES_DI;
+						if (EMUMODE = '1') then
+							SIV(7 downto 0) <= SNES_DI;
+						end if;
 					when x"0F" =>
-						SIV(15 downto 8) <= SNES_DI;
+						if (EMUMODE = '1') then
+							SIV(15 downto 8) <= SNES_DI;
+						end if;
+					when x"10" =>						--TMC
+						if (EMUMODE = '1') then
+							HVEN <= SNES_DI(1 downto 0);
+							TMMODE <= SNES_DI(7);
+						end if;
+					when x"12" =>						--HCNT
+						if (EMUMODE = '1') then
+							HCNT(7 downto 0) <= SNES_DI;
+						end if;
+					when x"13" =>
+						if (EMUMODE = '1') then
+							HCNT(8) <= SNES_DI(0);
+						end if;
+					when x"14" =>						--VCNT
+						if (EMUMODE = '1') then
+							VCNT(7 downto 0) <= SNES_DI;
+						end if;
+					when x"15" =>
+						if (EMUMODE = '1') then
+							VCNT(8) <= SNES_DI(0);
+						end if;
+					when x"25" =>						--BMAP
+						if (EMUMODE = '1') then
+							BMAP <= SNES_DI(6 downto 0) ;
+							SBW46 <= SNES_DI(7);
+						end if;
+					when x"27" =>						--CBWE
+						if (EMUMODE = '1') then
+							CBWE <= SNES_DI;
+						end if;
+					when x"2A" =>						--CIWP
+						if (EMUMODE = '1') then
+							CIWP <= SNES_DI;
+						end if;
+					when x"3F" =>						--BBF
+						if (EMUMODE = '1') then
+							BBF <= SNES_DI(7);
+						end if;
+					when x"50" =>						--MCNT
+						if (EMUMODE = '1') then
+							AM <= SNES_DI(1 downto 0);
+							if SNES_DI(1) = '1' then
+								MR <= (others => '0');
+							end if;
+						end if;
+					when x"51" =>						--MA
+						if (EMUMODE = '1') then
+							MA(7 downto 0) <= SNES_DI;
+						end if;
+					when x"52" =>
+						if (EMUMODE = '1') then
+							MA(15 downto 8) <= SNES_DI;
+						end if;
+					when x"53" =>						--MB
+						if (EMUMODE = '1') then
+							MB(7 downto 0) <= SNES_DI;
+						end if;
+					when x"54" =>
+						if (EMUMODE = '1') then
+							MB(15 downto 8) <= SNES_DI;
+							MATH_REQ <= '1';
+						end if;
 					when others => null;
 				end case;
 
@@ -1278,13 +1395,16 @@ begin
 			end if;
 			
 			if MATH_REQ = '1' then
-				MATH_CLK_CNT <= MATH_CLK_CNT + 1;
-				if AM(1) = '0' and MATH_CLK_CNT = 5-1 then
+				if EMUMODE = '0' then
+					MATH_CLK_CNT <= MATH_CLK_CNT + 1;
+				end if;
+
+				if AM(1) = '0' and (MATH_CLK_CNT = 5-1 or EMUMODE = '1') then
 					if AM(0) = '0' then
 						MR(39 downto 0) <= x"00" & MULR;
 						MB <= (others => '0');
 					else
-						if MB = x"0000" then 
+						if MB = x"0000" then
 							MR(39 downto 0) <= (others => '0');
 						else
 							MR(39 downto 0) <= x"00" & DIVR & DIVQ;
@@ -1292,14 +1412,18 @@ begin
 						MA <= (others => '0');
 						MB <= (others => '0');
 					end if;
-					MATH_CLK_CNT <= (others => '0');
+					if EMUMODE = '0' then
+						MATH_CLK_CNT <= (others => '0');
+					end if;
 					MATH_REQ <= '0';
-				elsif AM(1) = '1' and MATH_CLK_CNT = 6-1 then
+				elsif AM(1) = '1' and (MATH_CLK_CNT = 6-1 or EMUMODE = '1') then
 					SUM := resize(signed(MR), SUM'length) + resize(signed(MULR), SUM'length);
 					MR <= std_logic_vector(SUM(39 downto 0));
 					MOF <= SUM(40);
 					MB <= (others => '0');
-					MATH_CLK_CNT <= (others => '0');
+					if EMUMODE = '0' then
+						MATH_CLK_CNT <= (others => '0');
+					end if;
 					MATH_REQ <= '0';
 				end if;
 			end if;
@@ -1434,7 +1558,8 @@ begin
 end process;
 
 process( SNES_A, SNES_IRAM_ACCESS, SNES_CCDMA_IRAM_ACCESS, SNES_BWRAM_ACCESS, SNES_MMIO_READ_ACCESS, SNES_ROM_ACCESS, 
-			SNES_BWRAM_A, ROM_DI, IRAM_DO, BWRAM_DI, SIV, SNV, NMISEL, IRQSEL, SNES_IRQ_FLAG, CDMA_IRQ_FLAG, CMSG, OPENBUS, SNES_SSIO_READ_ACCESS, SS_DO )
+			SNES_BWRAM_A, ROM_DI, IRAM_DO, BWRAM_DI, SIV, SNV, NMISEL, IRQSEL, SNES_IRQ_FLAG, CDMA_IRQ_FLAG, CMSG, OPENBUS, SNES_SSIO_READ_ACCESS, SS_DO, SA1_IRQ_FLAG, TM_IRQ_FLAG,
+			DMA_IRQ_FLAG, SA1_NMI_FLAG, SMSG, H_CNT, HCR, VCR, MR, MOF, VDP, EMUMODE)
 begin
 	if SNES_ROM_ACCESS = '1' then													--ROM 00h-3Fh/80h-BFh:8000h-FFFFh, C0h-FFh:0000h-FFFFh 
 		if SNES_A(23 downto 1) = x"00FFE" & "101" and NMISEL = '1' then	--00FFEA/B
@@ -1460,6 +1585,85 @@ begin
 		case SNES_A(7 downto 0) is
 			when x"00" =>						--CCNT
 				SNES_DO <= SNES_IRQ_FLAG & IRQSEL & CDMA_IRQ_FLAG & NMISEL & CMSG;
+			-- Registers below should be read by SA1, not the CPU
+			when x"01" =>
+				if (EMUMODE = '1') then
+					SNES_DO <= SA1_IRQ_FLAG & TM_IRQ_FLAG & DMA_IRQ_FLAG & SA1_NMI_FLAG & SMSG;
+				else
+					SNES_DO <= OPENBUS;
+				end if;
+			when x"02" =>
+				if (EMUMODE = '1') then
+					SNES_DO <= std_logic_vector(H_CNT(7 downto 0));
+				else
+					SNES_DO <= OPENBUS;
+				end if;
+			when x"03" =>
+				if (EMUMODE = '1') then
+					SNES_DO <= "0000000" & HCR(8);
+				else
+					SNES_DO <= OPENBUS;
+				end if;
+			when x"04" =>
+				if (EMUMODE = '1') then
+					SNES_DO <= VCR(7 downto 0);
+				else
+					SNES_DO <= OPENBUS;
+				end if;
+			when x"05" =>
+				if (EMUMODE = '1') then
+					SNES_DO <= "0000000" & VCR(8);
+				else
+					SNES_DO <= OPENBUS;
+				end if;
+			when x"06" =>
+				if (EMUMODE = '1') then
+					SNES_DO <= MR(7 downto 0);
+				else
+					SNES_DO <= OPENBUS;
+				end if;
+			when x"07" =>
+				if (EMUMODE = '1') then
+					SNES_DO <= MR(15 downto 8);
+				else
+					SNES_DO <= OPENBUS;
+				end if;
+			when x"08" =>
+				if (EMUMODE = '1') then
+					SNES_DO <= MR(23 downto 16);
+				else
+					SNES_DO <= OPENBUS;
+				end if;
+			when x"09" =>
+				if (EMUMODE = '1') then
+					SNES_DO <= MR(31 downto 24);
+				else
+					SNES_DO <= OPENBUS;
+				end if;
+			when x"0A" =>
+				if (EMUMODE = '1') then
+					SNES_DO <= MR(39 downto 32);
+				else
+					SNES_DO <= OPENBUS;
+				end if;
+			when x"0B" =>
+				if (EMUMODE = '1') then
+					SNES_DO <= MOF & "0000000";	--OF
+				else
+					SNES_DO <= OPENBUS;
+				end if;
+			when x"0C" =>
+				if (EMUMODE = '1') then
+					SNES_DO <= VDP(7 downto 0);
+				else
+					SNES_DO <= OPENBUS;
+				end if;
+			when x"0D" =>
+				if (EMUMODE = '1') then
+					SNES_DO <= VDP(15 downto 8);
+				else
+					SNES_DO <= OPENBUS;
+				end if;
 			when others => 
 				SNES_DO <= OPENBUS;
 		end case;
@@ -1488,7 +1692,6 @@ port map (
 
 DIV: entity work.SA1DIV
 port map (
-	clock    => CLK,
 	numer		=> MA,
 	denom		=> MB,
 	quotient	=> DIVQ,
@@ -1517,8 +1720,8 @@ begin
 						when others => null;
 					end case;
 				end if;
-			elsif SA1_MMIO_WRITE = '1' and P65_A(7 downto 0) = x"11" then
-				H_CNT <= (others => '0');
+			elsif ((SA1_MMIO_WRITE = '1' and P65_A(7 downto 0) = x"11") or (EMUMODE = '1' and SNES_MMIO_WRITE = '1' and SNES_A(7 downto 0) = x"11")) then
+				H_CNT <= (others => '0');  -- CTR
 				V_CNT <= (others => '0');
 			elsif DOT_CLK = '1' then
 				if TMMODE = '0' then

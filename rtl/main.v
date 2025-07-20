@@ -55,6 +55,7 @@ module main (
 	output            GSU_ACTIVE,
 	input             GSU_TURBO,
 	input             GSU_FASTROM,
+	input             SA1_EMUMODE,
 	input             SUFAMI_SWAP,
 
 	input             BLEND,
@@ -619,6 +620,7 @@ SA1Map SA1Map
 (
 	.mclk(MCLK),
 	.rst_n(RESET_N),
+	.emumode(SA1_EMUMODE),
 
 	.ca(CA),
 	.di(DO),
