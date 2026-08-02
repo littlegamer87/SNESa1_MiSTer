@@ -151,7 +151,6 @@ architecture rtl of SCPU is
 	signal DMA_ACTIVE : std_logic;
 	signal HDMA_CH_WORK, HDMA_CH_RUN, HDMA_CH_DO: std_logic_vector(7 downto 0);
 	signal HDMA_CH_EN: std_logic_vector(7 downto 0);
-	signal HDMA_CH_ACTIVE: std_logic_vector(7 downto 0);
 	signal HDMA_EN, HDMA_START, HDMA_INIT_START : std_logic;
 	signal DMA_CH_EN: std_logic_vector(7 downto 0);
 	signal DMA_TRANSFER, HDMA_TRANSFER, FETCH_SCANLINE_COUNTER, FETCH_IND_ADDR, HDMA_BUS_ACTIVE : std_logic;
@@ -857,7 +856,6 @@ begin
 
 	--DMA/HDMA
 	HDMA_CH_EN <= HDMAEN and HDMA_CH_RUN and HDMA_CH_DO;
-	HDMA_CH_ACTIVE <= HDMA_CH_WORK and HDMA_CH_RUN and HDMA_CH_DO;
 	HDMA_CH_LAST <= IsLastHDMACh(HDMA_CH_EN and HDMA_CH_WORK, DMA_CH);
 	HDMA_EN <= '1' when (HDMAEN and HDMA_CH_RUN) /= x"00" else '0';
 				
@@ -1180,7 +1178,7 @@ begin
 		end if;
 	end process;
 
-	DMA_CH_EN <= HDMA_CH_ACTIVE when HDMA_RUN = '1' else MDMAEN;
+	DMA_CH_EN <= (HDMA_CH_WORK and HDMA_CH_RUN and HDMA_CH_DO) when HDMA_RUN = '1' else MDMAEN;
 	DMA_CH <= GetDMACh(DMA_CH_EN);
 
 	process( RST_N, CLK )
