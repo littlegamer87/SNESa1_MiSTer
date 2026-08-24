@@ -23,8 +23,8 @@ END SA1DIV;
 
 ARCHITECTURE SYN OF sa1div IS
 
+	SIGNAL numer_abs : STD_LOGIC_VECTOR (15 DOWNTO 0);
 	SIGNAL sub_wire0 : STD_LOGIC_VECTOR (15 DOWNTO 0);
-	SIGNAL srem      : STD_LOGIC_VECTOR (15 DOWNTO 0);
 	SIGNAL sub_wire1 : STD_LOGIC_VECTOR (15 DOWNTO 0);
 
 
@@ -48,15 +48,21 @@ ARCHITECTURE SYN OF sa1div IS
 	END COMPONENT;
 
 BEGIN
-	srem     <= sub_wire0 when denom /= x"0000" else numer;
-	remain   <= std_logic_vector(abs(signed(srem)));
-	quotient <= sub_wire1 when denom /= x"0000" else x"FFFF" when numer(15) = '0' else x"0001";
+
+	numer_abs <= std_logic_vector(abs(signed(numer)));
+
+	remain    <= numer_abs when denom = x"0000" else sub_wire0;
+
+	quotient  <= x"FFFF" when denom = x"0000" and numer(15) = '0' else
+					x"0001" when denom = x"0000" else
+					std_logic_vector(-signed(sub_wire1)) when numer(15) = '1' else
+					sub_wire1;
 
 	LPM_DIVIDE_component : LPM_DIVIDE
 	GENERIC MAP (
 		lpm_drepresentation => "UNSIGNED",
-		lpm_nrepresentation => "SIGNED",
-		lpm_hint     => "LPM_REMAINDERPOSITIVE=TRUE",
+		lpm_nrepresentation => "UNSIGNED",
+		lpm_hint     => "UNUSED",
 		lpm_pipeline => 6,
 		lpm_type     => "LPM_DIVIDE",
 		lpm_widthd   => 16,
@@ -65,7 +71,7 @@ BEGIN
 	PORT MAP (
 		clock    => clock,
 		denom    => denom,
-		numer    => numer,
+		numer    => numer_abs,
 		remain   => sub_wire0,
 		quotient => sub_wire1
 	);
